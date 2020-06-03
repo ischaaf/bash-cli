@@ -2,7 +2,7 @@
 
 BCLI_SECTIONS=(NONE: OPTIONS: ARGS: SUBCOMMANDS:)
 
-BCLI_OPT_RE="^(-[a-zA-Z0-9])?,?(--[^[:space:]]+)?[[:space:]]+(<([a-zA-Z0-9]+)>[[:space:]]+)(.*)$"
+BCLI_OPT_RE="^(-[a-zA-Z0-9])?,?(--[^[:space:]]+)?[[:space:]]+(<([a-zA-Z0-9]+)>[[:space:]]+)?(.*)$"
 
 function _bcli_reset () {
   unset BCLI_OPTS
@@ -20,6 +20,9 @@ function _bcli_reset () {
   declare -Agx BCLI_ARG_VALUES
   declare -gx  BCLI_SUBCOMMAND
   declare -agx BCLI_REMAINING
+  BCLI_OPTS=()
+  BCLI_ARGS=()
+  BCLI_CMDS=()
 }
 
 function _bcli_parse_doc () {
@@ -65,11 +68,19 @@ function _bcli_parse_doc () {
   done <<< "$doc"
 }
 
+function bcli_doc () {
+  # Kinda hacky right now, assume indent is 2 spaces
+  # This means the string should have 4 spaces of extra
+  # indent, remove with sub and save to doc variable
+  doc="${1//$'\n'    /$'\n'}"
+}
+
 function bcli_parse_opts () {
   local doc
   doc="$1"
   shift
   _bcli_parse_doc "$doc"
+  # echo "[BCLI] Starting arg parse, \$* is: '$*'"
 
   # Start Arg Parsing
   cur_arg=0
@@ -104,10 +115,12 @@ function bcli_parse_opts () {
               shift
             fi
             opt_set="1"
+            break
           fi
         done
         if [[ -z "$opt_set" ]]; then
           echo "Invalid option $1"
+          echo "$doc"
           return 1
         fi
         ;;
