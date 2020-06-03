@@ -14,13 +14,13 @@ function mycommand () {
     ARGS:
       field   Some custom field
   "
-  bcli_parse_opts "$doc" "$@"
-  if [[ "${BCLI_SUBCOMMAND:-}" == help || -n "${BCLI_OPT_VALUES[,--help]:-}" ]]; then
+  bcli_parse_opts "m_" "$doc" "$@"
+  if [[ "${m_subcmd:-}" == help || -n "${m_help:-}" ]]; then
     echo "$doc"
     return 0
   fi
-  echo "Custom option was set to: ${BCLI_OPT_VALUES[,--custom]:-}"
-  echo "Field was passed as: ${BCLI_ARG_VALUES[field]:-}"
+  echo "Custom option was set to: ${m_custom:-}"
+  echo "Field was passed as: ${m_field:-}"
 }
 
 function main() {
@@ -36,16 +36,16 @@ function main() {
       mycommand   Dummy first command
       cmd2        Dummy second command
   "
-  bcli_parse_opts "$doc" "$@"
-  if [[ "${BCLI_SUBCOMMAND:-}" == help || -n "${BCLI_OPT_VALUES[,--help]:-}" ]]; then
+  # local subcommand help config
+  bcli_parse_opts "" "$doc" "$@"
+  if [[ "${subcmd:-}" == help || -n "${help:-}" ]]; then
     echo "$doc"
     return 0
   fi
-  echo "Config is ${BCLI_OPT_VALUES[-c,--config]:-}"
-  echo "Args are: ${BCLI_ARG_VALUES[*]}"
-  echo "Subcommand is: ${BCLI_SUBCOMMAND:-}"
+  echo "Config is ${config}"
+  echo "Subcommand is: ${subcmd:-}"
   echo "Remaining is: ${BCLI_REMAINING[*]}"
-  if [[ "${BCLI_SUBCOMMAND:-}" == mycommand ]]; then
+  if [[ "${subcmd:-}" == mycommand ]]; then
     echo "Calling subcommand"
     mycommand "${BCLI_REMAINING[@]}"
   fi

@@ -2,23 +2,17 @@
 
 BCLI_SECTIONS=(NONE: OPTIONS: ARGS: SUBCOMMANDS:)
 
-BCLI_OPT_RE="^(-[a-zA-Z0-9])?,?(--[^[:space:]]+)?[[:space:]]+(<([a-zA-Z0-9]+)>[[:space:]]+)?(.*)$"
+BCLI_OPT_RE="^(-([a-zA-Z0-9]))?,?(--([^[:space:]]+))?[[:space:]]+(<([a-zA-Z0-9]+)>[[:space:]]+)?(.*)$"
 
 function _bcli_reset () {
   unset BCLI_OPTS
   unset BCLI_ARGS
   unset BCLI_CMDS
-  unset OPT_VALUES
-  unset ARG_VALUES
-  unset SUBCOMMAND
   unset REMAINING
 
   declare -agx BCLI_OPTS
   declare -agx BCLI_ARGS
   declare -agx BCLI_CMDS
-  declare -Agx BCLI_OPT_VALUES
-  declare -Agx BCLI_ARG_VALUES
-  declare -gx  BCLI_SUBCOMMAND
   declare -agx BCLI_REMAINING
   BCLI_OPTS=()
   BCLI_ARGS=()
@@ -45,8 +39,8 @@ function _bcli_parse_doc () {
       OPTIONS:)
         if [[ "$line" =~ $BCLI_OPT_RE ]]; then
           set +u
-          short="${BASH_REMATCH[1]}"
-          long="${BASH_REMATCH[2]}"
+          short="${BASH_REMATCH[2]}"
+          long="${BASH_REMATCH[4]}"
           set -u
         else
           echo "Invalid Option Format: $line"
@@ -76,9 +70,10 @@ function bcli_doc () {
 }
 
 function bcli_parse_opts () {
-  local doc
-  doc="$1"
-  shift
+  local doc prefix cur_arg opt_set short long arg_name opt_key opt_var extglob_state passed_opt cur_arg arg_var
+  prefix="$1"
+  doc="$2"
+  shift 2
   _bcli_parse_doc "$doc"
   # echo "[BCLI] Starting arg parse, \$* is: '$*'"
 
@@ -98,20 +93,28 @@ function bcli_parse_opts () {
           # echo "Checking opt line: $opt"
           [[ "$opt" =~ $BCLI_OPT_RE ]]
           set +u
-          short="${BASH_REMATCH[1]}"
-          long="${BASH_REMATCH[2]}"
-          arg_name="${BASH_REMATCH[4]}"
+          short="${BASH_REMATCH[2]}"
+          long="${BASH_REMATCH[4]}"
+          arg_name="${BASH_REMATCH[6]}"
+          opt_key="${long:-$short}"
+          opt_var="${opt_key//-/_}"
           # desc="${BASH_REMATCH[5]}"
           set -u
+          extglob_state="$(shopt -p extglob || :)"
+          shopt -s extglob
+          passed_opt="${1##+(-)}"
+          eval "$extglob_state"
           # echo "Checking with $short,$long"
-          if [[ "$1" == "$short" || "$1" == "$long" ]]; then
+          if [[ "$passed_opt" == "$short" || "$passed_opt" == "$long" ]]; then
             if [[ -n "$arg_name" ]]; then
-              # echo "Setting opt: $1 to value $2"
-              BCLI_OPT_VALUES["$short,$long"]="$2"
+              echo "Setting opt: $passed_opt to value $2"
+              declare -g "$prefix$opt_var=$2"
+              # BCLI_OPT_VALUES["$short,$long"]="$2"
               shift 2
             else
               # echo "Setting flag: $1"
-              BCLI_OPT_VALUES["$short,$long"]="1"
+              declare -g "$prefix$opt_var=1"
+              # BCLI_OPT_VALUES["$short,$long"]="1"
               shift
             fi
             opt_set="1"
@@ -127,14 +130,15 @@ function bcli_parse_opts () {
       *)
         if [[ "$cur_arg" -lt "${#BCLI_ARGS[@]}" ]]; then
           echo "[BCLI] Setting positional arg: ${BCLI_ARGS[$cur_arg]} to $1"
-          BCLI_ARG_VALUES["${BCLI_ARGS[$cur_arg]}"]="$1"
+          arg_var="${BCLI_ARGS[$cur_arg]}"
+          declare -g "$prefix$arg_var=$1"
           cur_arg=$((cur_arg + 1))
           shift
         elif [[ -z "${SUBCOMMAND:-}" && "${#BCLI_CMDS[@]}" ]]; then
           for cmd in "${BCLI_CMDS[@]}"; do
             if [[ "$cmd" == "$1" ]]; then
               echo "[BCLI] Setting subcommand to $1"
-              BCLI_SUBCOMMAND="$1"
+              declare -g "${prefix}subcmd=$1"
               shift
               BCLI_REMAINING+=("$@")
               return
